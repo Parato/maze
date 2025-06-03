@@ -18,6 +18,7 @@
         /* Container for the game and UI elements, centered on the screen */
         #gameContainer {
             display: flex;
+            flex-direction: column; /* Arrange items vertically */
             justify-content: center;
             align-items: center;
             height: 100vh; /* Full viewport height */
@@ -35,6 +36,7 @@
             height: 70vmin; /* Take 70% of the viewport's smaller dimension */
             max-width: 900px; /* Maximum width for desktop */
             max-height: 700px; /* Maximum height for desktop */
+            margin-bottom: 2vmin; /* Space between canvas and controls */
         }
 
         /* UI overlay for game status (time, coin, difficulty) */
@@ -62,7 +64,7 @@
         /* Main menu and game over screens */
         #menu, #gameOver {
             position: absolute;
-            top: 50%;
+            top: 45%;
             left: 50%;
             transform: translate(-50%, -50%); /* Center horizontally and vertically */
             background: rgba(0, 0, 0, 0.9); /* Slightly more opaque background */
@@ -131,6 +133,31 @@
             font-size: 1.6vmin; /* Responsive font size */
             line-height: 1.6;
         }
+
+        /* New styles for controls explanation */
+        #controlsExplanation {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 1.5vmin 3vmin;
+            border-radius: 1vmin;
+            border: 0.2vmin solid #00ff00;
+            text-align: center;
+            font-size: 1.8vmin;
+            color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            margin-top: 2vmin; /* Space from the canvas */
+            max-width: 80vmin; /* Max width to keep it from being too wide on desktop */
+            line-height: 1.4;
+        }
+
+        #controlsExplanation p {
+            margin: 0.5vmin 0;
+        }
+
+        #controlsExplanation .control-icon {
+            font-size: 2.5vmin; /* Larger icons */
+            vertical-align: middle;
+            margin: 0 0.5vmin;
+        }
     </style>
 </head>
 <body>
@@ -146,7 +173,7 @@
         <button id="menuButton" onclick="showMenu()">Back to Menu</button>
 
         <div id="menu">
-            <h1>🎮 MAZE GRAVITY</h1>
+            <h1>🎮 GRAVITY MAZE</h1>
             <div class="instructions">
                 Rotate the maze with your mouse or touch!<br>
                 Collect the coin 🪙 and reach the goal 🎯<br>
@@ -170,6 +197,13 @@
             <div id="newRecord" style="display: none; color: #ffff00;">🏆 NEW RECORD!</div>
             <button onclick="showMenu()">Back to Menu</button>
             <button onclick="restartGame()">Play Again</button>
+        </div>
+
+        <div id="controlsExplanation">
+            <p><strong>Controls:</strong></p>
+            <p>
+                <span class="control-icon">🖱️</span> Drag mouse left/right to rotate maze
+            </p>
         </div>
     </div>
 
