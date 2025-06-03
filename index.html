@@ -635,7 +635,7 @@
                 // const newMouseY = e.clientY - rect.top; // Not used for rotation in this game
                 
                 const deltaX = newMouseX - mouseX;
-                rotation += deltaX * 0.01; // Adjust rotation sensitivity
+                rotation -= deltaX * 0.01; // Inverted: subtract instead of add
                 
                 mouseX = newMouseX;
                 // mouseY = newMouseY;
