@@ -403,8 +403,8 @@
             
             // Helper function to check if a position is safe (not colliding with walls)
             function isPositionSafe(x, y) {
-                const ballRadius = 0.2; // Ball's effective radius in maze units
-                const safetyMargin = 0.1; // Small margin to prevent sticking
+                const ballRadius = 0.3; // Ball's effective radius in maze units
+                const safetyMargin = 0.01; // Small margin to prevent sticking
                 
                 // Check boundaries of the maze
                 if (x - ballRadius - safetyMargin <= 0 || 
@@ -594,7 +594,7 @@
                 // Draw ball with 3D effect
                 const ballX = ball.x * cellSize;
                 const ballY = ball.y * cellSize;
-                const ballRadius = cellSize * 0.2;
+                const ballRadius = cellSize * 0.3;
                 
                 // Ball shadow
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
