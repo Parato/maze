@@ -330,6 +330,10 @@
             document.getElementById('menu').style.display = 'block';
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('menuButton').style.display = 'none';
+            // Recalculate canvas size and render the menu state
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            render();
         }
 
         // Restart the current game difficulty
@@ -503,78 +507,81 @@
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the entire canvas
             
-            ctx.save(); // Save current canvas state
-            ctx.translate(canvas.width/2, canvas.height/2); // Move origin to center of canvas
-            ctx.rotate(rotation); // Apply maze rotation
-            ctx.translate(-mazeSize * cellSize / 2, -mazeSize * cellSize / 2); // Move origin to top-left of maze
+            // Only draw maze elements if the game is in 'playing' state
+            if (gameState === 'playing') { 
+                ctx.save(); // Save current canvas state
+                ctx.translate(canvas.width/2, canvas.height/2); // Move origin to center of canvas
+                ctx.rotate(rotation); // Apply maze rotation
+                ctx.translate(-mazeSize * cellSize / 2, -mazeSize * cellSize / 2); // Move origin to top-left of maze
 
-            // Draw maze walls and floor
-            for (let y = 0; y < mazeSize; y++) {
-                for (let x = 0; x < mazeSize; x++) {
-                    if (maze[y][x] === 1) {
-                        // 3D effect for walls
-                        ctx.fillStyle = '#333'; // Darker base for walls
-                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-                        ctx.fillStyle = '#555'; // Lighter top for highlight
-                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize/3);
-                        ctx.fillStyle = '#222'; // Darker bottom for shadow
-                        ctx.fillRect(x * cellSize, y * cellSize + cellSize*2/3, cellSize, cellSize/3);
-                    } else {
-                        // Floor
-                        ctx.fillStyle = '#001100'; // Dark green floor
-                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-                        ctx.strokeStyle = '#002200'; // Slightly lighter green for grid lines
-                        ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                // Draw maze walls and floor
+                for (let y = 0; y < mazeSize; y++) {
+                    for (let x = 0; x < mazeSize; x++) {
+                        if (maze[y][x] === 1) {
+                            // 3D effect for walls
+                            ctx.fillStyle = '#333'; // Darker base for walls
+                            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                            ctx.fillStyle = '#555'; // Lighter top for highlight
+                            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize/3);
+                            ctx.fillStyle = '#222'; // Darker bottom for shadow
+                            ctx.fillRect(x * cellSize, y * cellSize + cellSize*2/3, cellSize, cellSize/3);
+                        } else {
+                            // Floor
+                            ctx.fillStyle = '#001100'; // Dark green floor
+                            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                            ctx.strokeStyle = '#002200'; // Slightly lighter green for grid lines
+                            ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                        }
                     }
                 }
-            }
-            
-            // Draw coin if not collected
-            if (!coin.collected) {
-                ctx.fillStyle = '#FFD700'; // Gold color
+                
+                // Draw coin if not collected
+                if (!coin.collected) {
+                    ctx.fillStyle = '#FFD700'; // Gold color
+                    ctx.beginPath();
+                    ctx.arc((coin.x + 0.5) * cellSize, (coin.y + 0.5) * cellSize, 
+                           cellSize * 0.2, 0, Math.PI * 2); // Draw a circle
+                    ctx.fill();
+                    ctx.strokeStyle = '#FFA500'; // Orange stroke
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+                
+                // Draw goal (changes appearance after coin is collected)
+                const goalAlpha = coin.collected ? 1.0 : 0.3; // Full opacity if coin collected, otherwise faded
+                ctx.globalAlpha = goalAlpha;
+                ctx.fillStyle = coin.collected ? '#FF0000' : '#660000'; // Red if active, dark red if inactive
                 ctx.beginPath();
-                ctx.arc((coin.x + 0.5) * cellSize, (coin.y + 0.5) * cellSize, 
-                       cellSize * 0.2, 0, Math.PI * 2); // Draw a circle
+                ctx.arc((goal.x + 0.5) * cellSize, (goal.y + 0.5) * cellSize, 
+                       cellSize * 0.3, 0, Math.PI * 2); // Draw a circle
                 ctx.fill();
-                ctx.strokeStyle = '#FFA500'; // Orange stroke
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.globalAlpha = 1.0; // Reset global alpha
+                
+                // Draw ball with 3D effect
+                const ballX = ball.x * cellSize;
+                const ballY = ball.y * cellSize;
+                const ballRadius = cellSize * 0.2;
+                
+                // Ball shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(ballX + 2, ballY + 2, ballRadius * 0.8, ballRadius * 0.4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Ball gradient for 3D look
+                const gradient = ctx.createRadialGradient(ballX - ballRadius/3, ballY - ballRadius/3, 0, 
+                                                        ballX, ballY, ballRadius);
+                gradient.addColorStop(0, '#ffffff'); // White highlight
+                gradient.addColorStop(0.3, '#00ff00'); // Bright green mid-tone
+                gradient.addColorStop(1, '#008800'); // Dark green edge
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore(); // Restore canvas state
             }
-            
-            // Draw goal (changes appearance after coin is collected)
-            const goalAlpha = coin.collected ? 1.0 : 0.3; // Full opacity if coin collected, otherwise faded
-            ctx.globalAlpha = goalAlpha;
-            ctx.fillStyle = coin.collected ? '#FF0000' : '#660000'; // Red if active, dark red if inactive
-            ctx.beginPath();
-            ctx.arc((goal.x + 0.5) * cellSize, (goal.y + 0.5) * cellSize, 
-                   cellSize * 0.3, 0, Math.PI * 2); // Draw a circle
-            ctx.fill();
-            ctx.globalAlpha = 1.0; // Reset global alpha
-            
-            // Draw ball with 3D effect
-            const ballX = ball.x * cellSize;
-            const ballY = ball.y * cellSize;
-            const ballRadius = cellSize * 0.2;
-            
-            // Ball shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.beginPath();
-            ctx.ellipse(ballX + 2, ballY + 2, ballRadius * 0.8, ballRadius * 0.4, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Ball gradient for 3D look
-            const gradient = ctx.createRadialGradient(ballX - ballRadius/3, ballY - ballRadius/3, 0, 
-                                                    ballX, ballY, ballRadius);
-            gradient.addColorStop(0, '#ffffff'); // White highlight
-            gradient.addColorStop(0.3, '#00ff00'); // Bright green mid-tone
-            gradient.addColorStop(1, '#008800'); // Dark green edge
-            
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.restore(); // Restore canvas state
         }
 
         // Mouse event listeners for desktop rotation
@@ -640,28 +647,29 @@
 
         // Handle window resizing to make the canvas responsive
         window.addEventListener('resize', () => {
-            // Only re-calculate and re-render if the game is active or in menu to ensure correct sizing
-            if (gameState === 'playing' || gameState === 'menu') {
-                // Update canvas dimensions based on its computed CSS size
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                // Recalculate cellSize based on the new canvas dimensions, accounting for rotation
+            // Update canvas dimensions based on its computed CSS size
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+
+            // Recalculate cellSize only if mazeSize is defined (i.e., a game has started or difficulty is set)
+            if (mazeSize > 0) { // Check if mazeSize has been set from a difficulty
                 cellSize = Math.min(canvas.width, canvas.height) / (mazeSize * Math.sqrt(2));
-                render(); // Re-render the maze with the new cell size
+            } else {
+                // If no game has started, use a default mazeSize for initial render or menu display
+                // This ensures cellSize is not NaN or Infinity if mazeSize is 0
+                cellSize = Math.min(canvas.width, canvas.height) / (difficulties[0].size * Math.sqrt(2));
             }
+            render(); // Re-render the canvas
         });
 
         // Initial setup when the page loads
         window.onload = function () {
             loadRecords(); // Load existing high scores
-            // Initial call to set canvas size and render menu
+            // Set canvas dimensions based on its computed CSS size
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
-            // A dummy mazeSize for initial cellSize calculation, will be updated on startGame
-            mazeSize = difficulties[currentDifficulty].size;
-            // Calculate initial cellSize, accounting for rotation
-            cellSize = Math.min(canvas.width, canvas.height) / (mazeSize * Math.sqrt(2));
-            render(); // Render the initial menu state
+            // The render function will handle clearing the canvas and showing the menu.
+            render(); // Render the initial menu state (which just clears the canvas)
         };
     </script>
 </body>
