@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Maze Gravity Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            color: #00ff00;
+        }
+
+        #gameContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+        }
+
+        #gameCanvas {
+            border: 3px solid #00ff00;
+            border-radius: 10px;
+            box-shadow: 0 0 20px #00ff00;
+            background: #000;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+        }
+
+        #menuButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: none;
+        }
+
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #00ff00;
+            text-align: center;
+            z-index: 200;
+        }
+
+        button {
+            background: #1a1a2e;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #1a1a2e;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        #records {
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0, 50, 0, 0.5);
+            border-radius: 5px;
+        }
+
+        .record {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            border: 3px solid #00ff00;
+            text-align: center;
+            z-index: 300;
+            display: none;
+        }
+
+        h1, h2 {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .instructions {
+            margin: 20px 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="900" height="700"></canvas>
+        
+        <div id="ui">
+            <div>Time: <span id="timer">0.0</span>s</div>
+            <div>Coin: <span id="coinStatus">❌</span></div>
+            <div>Difficulty: <span id="difficulty">-</span></div>
+        </div>
+
+        <button id="menuButton" onclick="showMenu()">Back to Menu</button>
+
+        <div id="menu">
+            <h1>🎮 MAZE GRAVITY</h1>
+            <div class="instructions">
+                Rotate the maze with your mouse!<br>
+                Collect the coin 🪙 and reach the goal 🎯<br>
+                The ball follows gravity!
+            </div>
+            <button onclick="startGame(0)">Easy (10x10)</button>
+            <button onclick="startGame(1)">Medium (15x15)</button>
+            <button onclick="startGame(2)">Hard (20x20)</button>
+            
+            <div id="records">
+                <h3>🏆 Records</h3>
+                <div class="record">Easy: <span id="record0">-</span></div>
+                <div class="record">Medium: <span id="record1">-</span></div>
+                <div class="record">Hard: <span id="record2">-</span></div>
+            </div>
+        </div>
+
+        <div id="gameOver">
+            <h2>🎉 Completed!</h2>
+            <div>Time: <span id="finalTime"></span>s</div>
+            <div id="newRecord" style="display: none; color: #ffff00;">🏆 NEW RECORD!</div>
+            <button onclick="showMenu()">Back to Menu</button>
+            <button onclick="restartGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'menu';
+        let currentDifficulty = 0;
+        let maze = [];
+        let ball = { x: 0, y: 0, vx: 0, vy: 0 };
+        let coin = { x: 0, y: 0, collected: false };
+        let goal = { x: 0, y: 0 };
+        let rotation = 0;
+        let mouseX = 0, mouseY = 0;
+        let isDragging = false;
+        let startTime = 0;
+        let gameTime = 0;
+        let cellSize = 0;
+        let mazeSize = 0;
+        
+        const difficulties = [
+            { size: 10, name: 'Easy' },
+            { size: 15, name: 'Medium' },
+            { size: 20, name: 'Hard' }
+        ];
+
+        // Load records
+        function loadRecords() {
+            for (let i = 0; i < 3; i++) {
+                const record = localStorage.getItem(`mazeRecord${i}`);
+                if (record) {
+                    document.getElementById(`record${i}`).textContent = `${parseFloat(record).toFixed(1)}s`;
+                }
+            }
+        }
+
+        // Save record
+        function saveRecord(difficulty, time) {
+            const currentRecord = localStorage.getItem(`mazeRecord${difficulty}`);
+            if (!currentRecord || time < parseFloat(currentRecord)) {
+                localStorage.setItem(`mazeRecord${difficulty}`, time.toFixed(1));
+                loadRecords();
+                return true;
+            }
+            return false;
+        }
+
+        // Generate maze
+        function generateMaze(size) {
+            const maze = Array(size).fill().map(() => Array(size).fill(1));
+            
+            function carve(x, y) {
+                maze[y][x] = 0;
+                const directions = [[0, 2], [2, 0], [0, -2], [-2, 0]];
+                directions.sort(() => Math.random() - 0.5);
+                
+                for (let [dx, dy] of directions) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 1 && nx < size-1 && ny >= 1 && ny < size-1 && maze[ny][nx] === 1) {
+                        maze[y + dy/2][x + dx/2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+            
+            // Guarantee outer walls (row/column 0 and size-1 remain walls)
+            for (let i = 0; i < size; i++) {
+                maze[0][i] = 1;        // Top wall
+                maze[size-1][i] = 1;   // Bottom wall
+                maze[i][0] = 1;        // Left wall
+                maze[i][size-1] = 1;   // Right wall
+            }
+            
+            carve(1, 1);
+            
+            // Ensure start and goal are free
+            maze[1][1] = 0;
+            maze[size-2][size-2] = 0;
+            
+            // Ensure path to goal if needed
+            if (maze[size-2][size-2] === 1 || maze[size-3][size-2] === 1 || maze[size-2][size-3] === 1) {
+                maze[size-2][size-2] = 0;
+                maze[size-3][size-2] = 0;
+                maze[size-2][size-3] = 0;
+            }
+            
+            return maze;
+        }
+
+        // Place coin
+        function placeCoin() {
+            const freeCells = [];
+            for (let y = 0; y < mazeSize; y++) {
+                for (let x = 0; x < mazeSize; x++) {
+                    if (maze[y][x] === 0 && 
+                        !(x === 1 && y === 1) && 
+                        !(x === mazeSize-2 && y === mazeSize-2)) {
+                        freeCells.push({x, y});
+                    }
+                }
+            }
+            
+            if (freeCells.length > 0) {
+                const randomCell = freeCells[Math.floor(Math.random() * freeCells.length)];
+                coin.x = randomCell.x;
+                coin.y = randomCell.y;
+                coin.collected = false;
+            }
+        }
+
+        function startGame(difficulty) {
+            currentDifficulty = difficulty;
+            mazeSize = difficulties[difficulty].size;
+            // Increased cell size for larger visible area
+            cellSize = Math.min(canvas.width * 0.7, canvas.height * 0.7) / mazeSize;
+            
+            maze = generateMaze(mazeSize);
+            
+            ball.x = 1.5;
+            ball.y = 1.5;
+            ball.vx = 0;
+            ball.vy = 0;
+            
+            goal.x = mazeSize - 2;
+            goal.y = mazeSize - 2;
+            
+            placeCoin();
+            
+            rotation = 0;
+            startTime = Date.now();
+            gameState = 'playing';
+            
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('menuButton').style.display = 'block';
+            document.getElementById('difficulty').textContent = difficulties[difficulty].name;
+            document.getElementById('coinStatus').textContent = '❌';
+            
+            gameLoop();
+        }
+
+        function showMenu() {
+            gameState = 'menu';
+            document.getElementById('menu').style.display = 'block';
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('menuButton').style.display = 'none';
+        }
+
+        function restartGame() {
+            startGame(currentDifficulty);
+        }
+
+        function gameLoop() {
+            if (gameState !== 'playing') return;
+            
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update() {
+            gameTime = (Date.now() - startTime) / 1000;
+            document.getElementById('timer').textContent = gameTime.toFixed(1);
+            
+            // Gravity based on rotation
+            const gravity = 0.003;
+            const gravityX = Math.sin(rotation) * gravity;
+            const gravityY = Math.cos(rotation) * gravity;
+            
+            ball.vx += gravityX;
+            ball.vy += gravityY;
+            
+            // Damping
+            ball.vx *= 0.98;
+            ball.vy *= 0.98;
+            
+            // New position
+            const newX = ball.x + ball.vx;
+            const newY = ball.y + ball.vy;
+            
+            // Robust collision detection with anti-stuck system
+            const ballRadius = 0.2; // Still smaller for better control
+            const safetyMargin = 0.1; // Safety distance to walls
+            
+            // Helper function: Is position safe?
+            function isPositionSafe(x, y) {
+                // Check boundaries
+                if (x - ballRadius - safetyMargin <= 0 || 
+                    x + ballRadius + safetyMargin >= mazeSize ||
+                    y - ballRadius - safetyMargin <= 0 || 
+                    y + ballRadius + safetyMargin >= mazeSize) {
+                    return false;
+                }
+                
+                // Check wall collisions in 8 directions
+                const checkPoints = [
+                    {x: x - ballRadius - safetyMargin, y: y},                    // Left
+                    {x: x + ballRadius + safetyMargin, y: y},                    // Right
+                    {x: x, y: y - ballRadius - safetyMargin},                    // Top
+                    {x: x, y: y + ballRadius + safetyMargin},                    // Bottom
+                    {x: x - ballRadius - safetyMargin, y: y - ballRadius - safetyMargin}, // Top-Left
+                    {x: x + ballRadius + safetyMargin, y: y - ballRadius - safetyMargin}, // Top-Right
+                    {x: x - ballRadius - safetyMargin, y: y + ballRadius + safetyMargin}, // Bottom-Left
+                    {x: x + ballRadius + safetyMargin, y: y + ballRadius + safetyMargin}  // Bottom-Right
+                ];
+                
+                for (let point of checkPoints) {
+                    const cellX = Math.floor(point.x);
+                    const cellY = Math.floor(point.y);
+                    
+                    if (cellX >= 0 && cellX < mazeSize && cellY >= 0 && cellY < mazeSize) {
+                        if (maze[cellY][cellX] === 1) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            // Find safe position
+            function findSafePosition(startX, startY) {
+                // First check current position
+                if (isPositionSafe(startX, startY)) {
+                    return {x: startX, y: startY};
+                }
+                
+                // Search in spiral around current position
+                for (let radius = 0.1; radius <= 2.0; radius += 0.1) {
+                    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+                        const testX = startX + Math.cos(angle) * radius;
+                        const testY = startY + Math.sin(angle) * radius;
+                        
+                        if (isPositionSafe(testX, testY)) {
+                            return {x: testX, y: testY};
+                        }
+                    }
+                }
+                
+                // Fallback: Back to start
+                return {x: 1.5, y: 1.5};
+            }
+            
+            // Test movement
+            const newBallX = ball.x + ball.vx;
+            const newBallY = ball.y + ball.vy;
+            
+            // Check X movement
+            let canMoveX = isPositionSafe(newBallX, ball.y);
+            if (!canMoveX) {
+                ball.vx = -ball.vx * 0.7; // Damping on collision
+            }
+            
+            // Check Y movement
+            let canMoveY = isPositionSafe(ball.x, newBallY);
+            if (!canMoveY) {
+                ball.vy = -ball.vy * 0.7; // Damping on collision
+            }
+            
+            // Check diagonal movement if both individual movements are OK
+            let finalX = canMoveX ? newBallX : ball.x;
+            let finalY = canMoveY ? newBallY : ball.y;
+            
+            if (canMoveX && canMoveY && !isPositionSafe(finalX, finalY)) {
+                // Diagonal movement blocked - allow only one direction
+                if (Math.abs(ball.vx) > Math.abs(ball.vy)) {
+                    finalY = ball.y;
+                    ball.vy = -ball.vy * 0.7;
+                } else {
+                    finalX = ball.x;
+                    ball.vx = -ball.vx * 0.7;
+                }
+            }
+            
+            // Update position
+            ball.x = finalX;
+            ball.y = finalY;
+            
+            // Safety check: If ball is still in unsafe position
+            if (!isPositionSafe(ball.x, ball.y)) {
+                const safePos = findSafePosition(ball.x, ball.y);
+                ball.x = safePos.x;
+                ball.y = safePos.y;
+                // Reduce speed significantly as "punishment"
+                ball.vx *= 0.3;
+                ball.vy *= 0.3;
+            }
+            
+            // Additional speed limit
+            const maxSpeed = 0.15;
+            if (Math.abs(ball.vx) > maxSpeed) ball.vx = Math.sign(ball.vx) * maxSpeed;
+            if (Math.abs(ball.vy) > maxSpeed) ball.vy = Math.sign(ball.vy) * maxSpeed;
+            
+            // Collect coin
+            if (!coin.collected) {
+                const coinDist = Math.sqrt(Math.pow(ball.x - (coin.x + 0.5), 2) + 
+                                         Math.pow(ball.y - (coin.y + 0.5), 2));
+                if (coinDist < 0.5) {
+                    coin.collected = true;
+                    document.getElementById('coinStatus').textContent = '✅';
+                }
+            }
+            
+            // Reach goal
+            if (coin.collected) {
+                const goalDist = Math.sqrt(Math.pow(ball.x - (goal.x + 0.5), 2) + 
+                                         Math.pow(ball.y - (goal.y + 0.5), 2));
+                if (goalDist < 0.5) {
+                    gameState = 'completed';
+                    const isNewRecord = saveRecord(currentDifficulty, gameTime);
+                    document.getElementById('finalTime').textContent = gameTime.toFixed(1);
+                    document.getElementById('newRecord').style.display = isNewRecord ? 'block' : 'none';
+                    document.getElementById('gameOver').style.display = 'block';
+                    document.getElementById('menuButton').style.display = 'none';
+                }
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(canvas.width/2, canvas.height/2);
+            ctx.rotate(rotation);
+            ctx.translate(-mazeSize * cellSize / 2, -mazeSize * cellSize / 2);
+            
+            // Draw maze
+            for (let y = 0; y < mazeSize; y++) {
+                for (let x = 0; x < mazeSize; x++) {
+                    if (maze[y][x] === 1) {
+                        // 3D effect for walls
+                        ctx.fillStyle = '#333';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                        ctx.fillStyle = '#555';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize/3);
+                        ctx.fillStyle = '#222';
+                        ctx.fillRect(x * cellSize, y * cellSize + cellSize*2/3, cellSize, cellSize/3);
+                    } else {
+                        // Floor
+                        ctx.fillStyle = '#001100';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                        ctx.strokeStyle = '#002200';
+                        ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+            
+            // Draw coin
+            if (!coin.collected) {
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc((coin.x + 0.5) * cellSize, (coin.y + 0.5) * cellSize, 
+                       cellSize * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#FFA500';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
+            // Draw goal
+            const goalAlpha = coin.collected ? 1.0 : 0.3;
+            ctx.globalAlpha = goalAlpha;
+            ctx.fillStyle = coin.collected ? '#FF0000' : '#660000';
+            ctx.beginPath();
+            ctx.arc((goal.x + 0.5) * cellSize, (goal.y + 0.5) * cellSize, 
+                   cellSize * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            
+            // Draw ball (3D effect) - adjusted size
+            const ballX = ball.x * cellSize;
+            const ballY = ball.y * cellSize;
+            const ballRadius = cellSize * 0.2; // Adjusted to new ball size
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(ballX + 2, ballY + 2, ballRadius * 0.8, ballRadius * 0.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Ball
+            const gradient = ctx.createRadialGradient(ballX - ballRadius/3, ballY - ballRadius/3, 0, 
+                                                    ballX, ballY, ballRadius);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.3, '#00ff00');
+            gradient.addColorStop(1, '#008800');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            if (gameState === 'playing') {
+                isDragging = true;
+                const rect = canvas.getBoundingClientRect();
+                mouseX = e.clientX - rect.left;
+                mouseY = e.clientY - rect.top;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging && gameState === 'playing') {
+                const rect = canvas.getBoundingClientRect();
+                const newMouseX = e.clientX - rect.left;
+                const newMouseY = e.clientY - rect.top;
+                
+                const deltaX = newMouseX - mouseX;
+                rotation += deltaX * 0.01;
+                
+                mouseX = newMouseX;
+                mouseY = newMouseY;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDragging = false;
+        });
+
+        // Touch events for mobile
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'playing') {
+                isDragging = true;
+                const rect = canvas.getBoundingClientRect();
+                mouseX = e.touches[0].clientX - rect.left;
+                mouseY = e.touches[0].clientY - rect.top;
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isDragging && gameState === 'playing') {
+                const rect = canvas.getBoundingClientRect();
+                const newMouseX = e.touches[0].clientX - rect.left;
+                
+                const deltaX = newMouseX - mouseX;
+                rotation += deltaX * 0.01;
+                
+                mouseX = newMouseX;
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isDragging = false;
+        });
+
+        // Initialization
+        loadRecords();
+    </script>
+</body>
+</html>
